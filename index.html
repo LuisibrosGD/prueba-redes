@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Center — ANSI/BICSI 002 · Simulador Educativo</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+:root{
+  --bg:#f0f2f5;
+  --surface:#ffffff;
+  --surface2:#f7f8fa;
+  --border:#e2e6ed;
+  --border2:#c8cfd9;
+  --text:#1a2035;
+  --muted:#6b7a96;
+  --blue:#2563eb;
+  --blue-light:#eff4ff;
+  --green:#16a34a;
+  --green-light:#f0fdf4;
+  --amber:#d97706;
+  --amber-light:#fffbeb;
+  --red:#dc2626;
+  --red-light:#fef2f2;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'IBM Plex Sans',sans-serif;
+}
+
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+.topbar{
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  padding:0 2rem;
+  height:56px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  position:sticky;top:0;z-index:100;
+}
+.topbar-left{display:flex;align-items:center;gap:16px}
+.topbar-logo{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--blue);}
+.topbar-sep{width:1px;height:20px;background:var(--border)}
+.topbar-title{font-size:13px;color:var(--muted);font-weight:400}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.status-pill{
+  display:flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:11px;font-weight:600;
+  padding:4px 12px;border-radius:20px;
+}
+.status-pill.ok{background:var(--green-light);color:var(--green)}
+.status-pill.warn{background:var(--amber-light);color:var(--amber)}
+.status-pill.crit{background:var(--red-light);color:var(--red)}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:blink 1.4s infinite}
+.clock{font-family:var(--mono);font-size:12px;color:var(--muted)}
+
+.main{display:grid;grid-template-columns:1fr 340px;gap:0;height:calc(100vh - 56px)}
+
+.dc-canvas{background:var(--surface2);border-right:1px solid var(--border);padding:1.5rem;overflow-y:auto;}
+.dc-title{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:1rem;display:flex;align-items:center;gap:8px;}
+.dc-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.floor{background:var(--surface);border:1.5px solid var(--border2);border-radius:12px;padding:1.5rem;position:relative;}
+.floor-label{position:absolute;top:-11px;left:20px;background:var(--surface);padding:0 8px;font-family:var(--mono);font-size:10px;color:var(--muted);}
+
+.zones{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.zone{border:1.5px solid var(--border);border-radius:8px;padding:12px;background:var(--surface2);transition:all 0.3s;}
+.zone.warn{border-color:#fcd34d;background:#fffef7}
+.zone.crit{border-color:#fca5a5;background:#fff8f8}
+.zone-label{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--muted);margin-bottom:8px;}
+
+.racks{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;}
+.rack{width:20px;background:linear-gradient(180deg,#e2e8f4 0%,#c8d0e0 100%);border:1px solid #b8c2d4;border-radius:3px;height:50px;position:relative;}
+.rack .light{width:5px;height:5px;border-radius:50%;background:#22c55e;margin:3px auto;}
+.rack.warn .light{background:var(--amber)}
+.rack.crit .light{background:var(--red);animation:blink 0.6s infinite}
+
+.zone-bar-wrap{margin-top:6px;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.zone-bar{height:100%;border-radius:2px;transition:width 0.5s;}
+
+.sidebar{background:var(--surface);overflow-y:auto;display:flex;flex-direction:column;}
+.panel{border-bottom:1px solid var(--border);padding:1rem;}
+.panel-title{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:0.1em;margin-bottom:0.8rem;}
+
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.kpi{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px;}
+.kpi-label{font-size:10px;color:var(--muted)}
+.kpi-val{font-family:var(--mono);font-size:18px;font-weight:600;}
+
+.alerts-list{max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;}
+.alert-item{font-size:11px;padding:6px 8px;border-radius:5px;background:var(--surface2);border-left:3px solid var(--blue);}
+.alert-item.warn{border-left-color:var(--amber);background:var(--amber-light)}
+.alert-item.crit{border-left-color:var(--red);background:var(--red-light)}
+
+.ctrl-btn{width:100%;padding:8px 10px;margin-bottom:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);font-size:12px;font-weight:500;cursor:pointer;text-align:left;}
+.ctrl-btn:hover{border-color:var(--blue);background:var(--blue-light)}
+.ctrl-btn.danger:hover{border-color:var(--red);background:var(--red-light)}
+.ctrl-btn.success:hover{border-color:var(--green);background:var(--green-light)}
+
+.content-block{background:var(--surface2);border-radius:6px;padding:8px 10px;margin-bottom:10px;border-left:3px solid var(--blue);}
+.content-block strong{font-size:11px;display:block;margin-bottom:4px;}
+.content-block p{font-size:10px;color:var(--muted);line-height:1.4;}
+.rating-badge{display:inline-block;background:var(--blue-light);color:var(--blue);border-radius:12px;padding:2px 8px;font-family:var(--mono);font-size:9px;margin-top:4px;}
+
+.norm-note{background:var(--blue-light);padding:10px;font-size:10px;color:#1d4ed8;font-family:var(--mono);text-align:center;margin-top:auto;}
+
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+#crash-overlay{display:none;position:fixed;inset:0;background:rgba(220,38,38,0.95);z-index:1000;flex-direction:column;align-items:center;justify-content:center;color:white;text-align:center;}
+#crash-overlay.show{display:flex}
+.restart-btn{margin-top:20px;padding:10px 24px;background:white;color:var(--red);border:none;border-radius:8px;font-weight:bold;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-logo">ANSI/BICSI 002 · SIM</div>
+    <div class="topbar-sep"></div>
+    <div class="topbar-title">Gestión, operación y buenas prácticas</div>
+  </div>
+  <div class="topbar-right">
+    <div class="status-pill ok" id="status-pill"><div class="dot"></div><span id="status-text">OPERACIONAL</span></div>
+    <div class="clock" id="clock"></div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="dc-canvas">
+    <div class="dc-title">📡 VISTA EN TIEMPO REAL · DATA CENTER</div>
+    <div class="floor">
+      <div class="floor-label">PISO TÉCNICO · PASILLO FRÍO/CALIENTE</div>
+      <div class="zones">
+        <div class="zone" id="zone-servers">
+          <div class="zone-label">🖥 SALA DE EQUIPOS (CPU)</div>
+          <div class="racks" id="racks"></div>
+          <div class="zone-bar-wrap"><div class="zone-bar" id="cpu-bar" style="width:42%"></div></div>
+          <div style="font-family:var(--mono);font-size:14px;" id="cpu-val">42%</div>
+          <div style="font-size:9px;color:var(--muted);margin-top:4px;" id="airflow-label">🌬 Pasillo frío</div>
+        </div>
+        <div class="zone" id="zone-hvac">
+          <div class="zone-label">🌡 CLIMATIZACIÓN (HVAC)</div>
+          <div style="font-size:22px;font-family:var(--mono);font-weight:600;" id="temp-val">22°C</div>
+          <div class="zone-bar-wrap"><div class="zone-bar" id="temp-bar" style="width:40%"></div></div>
+          <div style="font-size:9px;" id="temp-status">✓ Rango óptimo</div>
+          <div style="margin-top:6px;font-size:10px;">💧 Humedad: <span id="humidity">47</span>%</div>
+        </div>
+        <div class="zone" id="zone-net">
+          <div class="zone-label">🔗 RED Y TRANSMISIÓN</div>
+          <div style="font-size:18px;font-family:var(--mono);" id="bw-val">1.2 Gb/s</div>
+          <div class="zone-bar-wrap"><div class="zone-bar" id="bw-bar" style="width:30%"></div></div>
+          <div style="font-size:10px;">⏱ Latencia: <span id="latency">2.1</span> ms</div>
+        </div>
+        <div class="zone" id="zone-power">
+          <div class="zone-label">⚡ ENERGÍA + SEGURIDAD</div>
+          <div>🔋 UPS: <span id="ups-val">98</span>% <span id="gen-status" style="margin-left:8px;">● STANDBY</span></div>
+          <div>🔌 Red eléctrica: <span id="grid-status">● ACTIVA</span></div>
+          <div>🔥 Incendios: <span id="fire-status">✅ Sin eventos</span></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px;">
+        <div style="background:var(--surface);padding:6px;border-radius:6px;"><div style="font-size:9px;">PUE</div><div id="pue-val" style="font-weight:bold;">1.42</div></div>
+        <div style="background:var(--surface);padding:6px;border-radius:6px;"><div style="font-size:9px;">UPTIME</div><div id="uptime-val" style="font-weight:bold;">99.98%</div></div>
+        <div style="background:var(--surface);padding:6px;border-radius:6px;"><div style="font-size:9px;">CAPACIDAD USADA</div><div id="cap-val" style="font-weight:bold;">63%</div></div>
+        <div style="background:var(--surface);padding:6px;border-radius:6px;"><div style="font-size:9px;">RATING BICSI</div><div id="rating-val" style="font-weight:bold;">Nivel 2</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="panel">
+      <div class="panel-title">📋 ALERTAS ACTIVAS</div>
+      <div class="alerts-list" id="alerts-list"><div class="alert-item">✅ Sistema inicializado - monitoreo activo</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">🎮 SIMULAR ESCENARIOS</div>
+      <button class="ctrl-btn" id="btn-heat">🌡 Sobrecalentamiento (fallo HVAC)</button>
+      <button class="ctrl-btn" id="btn-traffic">📈 Pico de tráfico (CPU/red alta)</button>
+      <button class="ctrl-btn" id="btn-power">⚡ Fallo de red eléctrica</button>
+      <button class="ctrl-btn success" id="btn-scale">📦 Escalar capacidad (buena práctica)</button>
+      <button class="ctrl-btn danger" id="btn-ignore">⚠ IGNORAR ALERTA ACTIVA</button>
+      <button class="ctrl-btn" id="btn-reset">✅ Restablecer sistema</button>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">📘 ANSI/BICSI 002 — CONTENIDO COMPLETO</div>
+      <div class="content-block"><strong>📌 ¿Qué expone?</strong><p>Diseño, construcción y operación de centros de datos. Relación con TIA, ISO, IEEE. Resuelve el caos sin estándares.</p></div>
+      <div class="content-block"><strong>🏆 Clasificación (Rating 0–4)</strong><p>Clase 0 = básico · Clase 4 = alta disponibilidad (similar a Tier IV). Un banco necesita Rating 4.</p><span class="rating-badge" id="rating-badge-display">Actual: Nivel 2</span></div>
+      <div class="content-block"><strong>🏗 Infraestructura física</strong><p>Pasillos fríos/calientes, cableado estructurado, racks. El flujo de aire evita sobrecalentamiento.</p></div>
+      <div class="content-block"><strong>⚡ Energía + climatización + seguridad</strong><p>UPS, generadores, HVAC, control de acceso. Sin UPS → caída total. No se usa agua en incendios.</p></div>
+      <div class="content-block"><strong>📋 Gestión y buenas prácticas</strong><p>Monitoreo continuo (temperatura, CPU, PUE, uptime). Si no se sigue la norma → fallos críticos.</p></div>
+    </div>
+    <div class="norm-note">📐 ANSI/BICSI 002 · La respuesta oportuna a alertas es OBLIGATORIA para garantizar continuidad del negocio.</div>
+  </div>
+</div>
+
+<div id="crash-overlay">
+  <h2>💥 FALLO CRÍTICO DEL DATA CENTER</h2>
+  <p>Se ignoraron alertas críticas. Según ANSI/BICSI 002, el monitoreo continuo y la respuesta inmediata son obligatorios.<br>La negligencia operativa llevó al colapso total.</p>
+  <button class="restart-btn" id="crash-restart">🔄 Reiniciar simulación</button>
+</div>
+
+<script>
+// Estado inicial
+let state = {
+  temp: 22, tempTarget: 22,
+  cpu: 42, cpuTarget: 42,
+  bw: 1.2, bwTarget: 1.2,
+  ups: 98, gridOk: true,
+  capacity: 63,
+  pue: 1.42,
+  uptime: 99.98,
+  rating: 2,
+  activeAlert: null,     // null, 'heat', 'traffic', 'power'
+  alertLevel: 0,         // 0=ninguna, 1=warning, 2=critic
+  ignoreCount: 0,
+  crashed: false
+};
+
+let intervalId;
+
+function addAlert(text, type) {
+  if (state.crashed) return;
+  const container = document.getElementById('alerts-list');
+  const div = document.createElement('div');
+  div.className = `alert-item ${type}`;
+  div.innerHTML = `⚠ ${text}`;
+  container.insertBefore(div, container.firstChild);
+  while(container.children.length > 6) container.removeChild(container.lastChild);
+}
+
+function updateUI() {
+  document.getElementById('temp-val').innerText = state.temp.toFixed(1)+'°C';
+  document.getElementById('cpu-val').innerText = Math.min(100, Math.floor(state.cpu))+'%';
+  document.getElementById('cpu-bar').style.width = Math.min(100, state.cpu)+'%';
+  document.getElementById('bw-val').innerText = state.bw.toFixed(1)+' Gb/s';
+  document.getElementById('bw-bar').style.width = Math.min(100, (state.bw/10)*100)+'%';
+  document.getElementById('latency').innerText = (1.5 + (state.bw/10)*2).toFixed(1);
+  document.getElementById('ups-val').innerText = Math.floor(state.ups);
+  document.getElementById('pue-val').innerText = state.pue.toFixed(2);
+  document.getElementById('uptime-val').innerText = state.uptime.toFixed(2)+'%';
+  document.getElementById('cap-val').innerText = state.capacity+'%';
+  document.getElementById('rating-val').innerText = `Nivel ${state.rating}`;
+  document.getElementById('rating-badge-display').innerHTML = `Actual: Nivel ${state.rating}`;
+  document.getElementById('humidity').innerText = 45 + Math.sin(Date.now()*0.002)*5;
+  
+  let tempPct = Math.min(100, ((state.temp-15)/30)*100);
+  document.getElementById('temp-bar').style.width = tempPct+'%';
+  let tempStatus = document.getElementById('temp-status');
+  if(state.temp > 35) { tempStatus.innerText = '⚠ CRÍTICO >35°C'; tempStatus.style.color='var(--red)';}
+  else if(state.temp > 28) { tempStatus.innerText = '⚠ Elevado'; tempStatus.style.color='var(--amber)';}
+  else { tempStatus.innerText = '✓ Rango óptimo 18-27°C'; tempStatus.style.color='var(--green)';}
+  
+  let status = 'ok';
+  if(state.activeAlert === 'heat' && state.temp > 35) status = 'crit';
+  else if(state.activeAlert !== null) status = 'warn';
+  if(state.cpu > 85) status = 'crit';
+  const pill = document.getElementById('status-pill');
+  const txt = document.getElementById('status-text');
+  pill.className = `status-pill ${status}`;
+  if(status==='ok') txt.innerText='OPERACIONAL';
+  else if(status==='warn') txt.innerText='ADVERTENCIA';
+  else txt.innerText='CRÍTICO';
+  
+  document.getElementById('zone-servers').className = 'zone' + (state.cpu>80?' crit':state.cpu>70?' warn':'');
+  document.getElementById('zone-hvac').className = 'zone' + (state.temp>35?' crit':state.temp>28?' warn':'');
+  document.getElementById('zone-power').className = 'zone' + (state.ups<30?' crit':state.ups<60?' warn':'');
+  document.getElementById('grid-status').innerHTML = state.gridOk ? '● ACTIVA' : '✗ CORTADA';
+  document.getElementById('grid-status').style.color = state.gridOk ? 'var(--green)' : 'var(--red)';
+  document.getElementById('gen-status').innerHTML = (!state.gridOk && state.ups<90) ? '⚙ ACTIVO' : '● STANDBY';
+  
+  let racksDiv = document.getElementById('racks');
+  racksDiv.innerHTML = '';
+  for(let i=0;i<12;i++){
+    let r = document.createElement('div');
+    r.className = 'rack';
+    if(state.cpu>80) r.classList.add('crit');
+    else if(state.cpu>70) r.classList.add('warn');
+    r.innerHTML = `<div class="light"></div>`;
+    racksDiv.appendChild(r);
+  }
+}
+
+function applyRating() {
+  if(state.uptime >= 99.99) state.rating = 4;
+  else if(state.uptime >= 99.9) state.rating = 3;
+  else if(state.uptime >= 99.0) state.rating = 2;
+  else state.rating = 1;
+  if(state.crashed) state.rating = 0;
+}
+
+function tick() {
+  if(state.crashed) return;
+  state.temp = state.temp * 0.95 + state.tempTarget * 0.05;
+  state.cpu = state.cpu * 0.93 + state.cpuTarget * 0.07;
+  state.bw = state.bw * 0.94 + state.bwTarget * 0.06;
+  if(!state.gridOk && state.ups > 5) state.ups -= 0.4;
+  if(!state.gridOk && state.ups < 30 && state.ups > 5) addAlert('UPS bajo! Generador debe arrancar', 'warn');
+  if(state.ups < 5) { addAlert('UPS AGOTADO - FALLO TOTAL', 'crit'); crashSystem(); return; }
+  
+  state.pue = 1.3 + (state.temp/22)*0.1 + (state.cpu/1000);
+  state.uptime = Math.min(99.99, state.uptime + (state.activeAlert? -0.005: 0.002));
+  if(state.uptime < 99.0 && state.activeAlert) addAlert('Uptime bajo - riesgo de SLA', 'warn');
+  applyRating();
+  updateUI();
+}
+
+function crashSystem() {
+  if(state.crashed) return;
+  state.crashed = true;
+  clearInterval(intervalId);
+  document.getElementById('crash-overlay').classList.add('show');
+}
+
+function restoreSystem() {
+  state = {
+    temp: 22, tempTarget: 22,
+    cpu: 42, cpuTarget: 42,
+    bw: 1.2, bwTarget: 1.2,
+    ups: 98, gridOk: true,
+    capacity: 63,
+    pue: 1.42,
+    uptime: 99.98,
+    rating: 2,
+    activeAlert: null,
+    alertLevel: 0,
+    ignoreCount: 0,
+    crashed: false
+  };
+  document.getElementById('crash-overlay').classList.remove('show');
+  document.getElementById('alerts-list').innerHTML = '<div class="alert-item">✅ Sistema restablecido - operación normal</div>';
+  if(intervalId) clearInterval(intervalId);
+  intervalId = setInterval(tick, 1000);
+  addAlert('Sistema recuperado - volviendo a estado normal', 'info');
+  updateUI();
+}
+
+// Escenarios
+document.getElementById('btn-heat').onclick = () => {
+  if(state.crashed) return;
+  state.tempTarget = 38;
+  state.activeAlert = 'heat';
+  addAlert('🌡 SOBRECALENTAMIENTO - HVAC insuficiente. Temperatura subiendo a 38°C', 'warn');
+};
+document.getElementById('btn-traffic').onclick = () => {
+  if(state.crashed) return;
+  state.cpuTarget = 91;
+  state.bwTarget = 8.5;
+  state.activeAlert = 'traffic';
+  addAlert('📈 PICO DE TRÁFICO - CPU al 91%, latencia elevada', 'warn');
+};
+document.getElementById('btn-power').onclick = () => {
+  if(state.crashed) return;
+  state.gridOk = false;
+  state.activeAlert = 'power';
+  addAlert('⚡ FALLO DE RED ELÉCTRICA - UPS activo, generador arrancando', 'warn');
+  setTimeout(() => { if(!state.crashed && !state.gridOk) addAlert('✅ Generador en marcha - continuidad asegurada', 'info'); }, 3000);
+};
+document.getElementById('btn-scale').onclick = () => {
+  if(state.crashed) return;
+  state.capacity = Math.max(55, state.capacity - 8);
+  state.cpuTarget = Math.min(80, state.cpuTarget + 5);
+  addAlert('📦 ESCALAR CAPACIDAD - Nuevos racks instalados. Capacidad usada reducida.', 'info');
+  updateUI();
+};
+document.getElementById('btn-ignore').onclick = () => {
+  if(state.crashed) return;
+  if(state.activeAlert === null) {
+    addAlert('❌ No hay alertas activas para ignorar. Genere un escenario primero.', 'info');
+    return;
+  }
+  state.ignoreCount++;
+  if(state.ignoreCount === 1) {
+    if(state.activeAlert === 'heat') state.tempTarget = 45;
+    if(state.activeAlert === 'traffic') state.cpuTarget = 98;
+    if(state.activeAlert === 'power') state.ups -= 30;
+    addAlert(`⚠ ALERTA IGNORADA (1/2) - La situación empeora gravemente`, 'crit');
+  } else if(state.ignoreCount >= 2) {
+    addAlert(`🔴 ALERTA IGNORADA POR SEGUNDA VEZ - FALLO INMINENTE DEL DATA CENTER`, 'crit');
+    crashSystem();
+  }
+};
+document.getElementById('btn-reset').onclick = () => restoreSystem();
+document.getElementById('crash-restart').onclick = () => restoreSystem();
+
+function updateClock(){ document.getElementById('clock').innerHTML = new Date().toLocaleTimeString('es-PE'); }
+setInterval(updateClock,1000);
+updateClock();
+
+intervalId = setInterval(tick, 1000);
+updateUI();
+</script>
+</body>
+</html>
